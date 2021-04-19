@@ -1,3 +1,4 @@
+# go to readme first
 from mpi4py import MPI
 import pandas as pd
 import numpy as np
@@ -41,7 +42,7 @@ NUM_FEATURES = len(cols)  # I will often add 1 to it for bias
 # exit()
 
 
-class LogRegSGD:  # SIGNSGD
+class LogRegSGD:  # ignore this class
     def __init__(self, learning_rate=0.05, num_iterations=10000):
         self.learning_rate = learning_rate
         self.weights = None
@@ -198,17 +199,18 @@ class LogReg:  # Ignore this class, just for reference
         return prediction
 
 
-class LogisticReg:
-    def __init__(self):
+class LogisticReg:  # the class we are using
+    def __init__(self):  # weight vector belonging to this class
         self.W = None
 
+    # get a randomly generated weight vector once for parameter server which also includes bias
     def getInitialW(self, numFeatures: int):
         return np.random.rand(numFeatures)
 
-    def sigmoid(self, x):
+    def sigmoid(self, x):  # basic sigmoid function
         return(1/(1+np.exp(-x)))
 
-    def accuracy(self, testX, testy):
+    def accuracy(self, testX, testy):  # accuracy function for test data
         augx = np.ones((testX.shape[0], testX.shape[1]+1))
         augx[:, :-1] = testX
         prediction = np.dot(augx, self.W)
@@ -218,7 +220,7 @@ class LogisticReg:
         count = np.count_nonzero(prediction == testy)
         return count/testy.shape[0]
 
-    def predict(self, X):
+    def predict(self, X):  # predict on data
         augx = np.ones((X.shape[0], X.shape[1]+1))
         augx[:, :-1] = X
         prediction = np.dot(augx, self.W)
@@ -227,7 +229,7 @@ class LogisticReg:
         prediction[prediction < 0.5] = 0.0
         return prediction
 
-    def getGradient(self, X, y):
+    def getGradient(self, X, y):  # get gradient of logistic regression
         N = y.shape[0]
         hx = np.dot(X, self.W)
         hx = self.sigmoid(hx)
@@ -236,14 +238,17 @@ class LogisticReg:
         result = np.dot((hx-y).T, X)/N
         return result
 
-    def train(self, W, trainX, trainy, alpha, iterations=10000):
-        self.W = W
-        N = trainX.shape[0]
+    def train(self, W, trainX, trainy, alpha, iterations=10000):  # train on training data
+        self.W = W  # take weight vector from parameter server initially
+        N = trainX.shape[0]  # number of data points
+        # one more column of only ones attached to training data for bias
         newX = np.ones((N, NUM_FEATURES+1))
         newX[:, :-1] = trainX
 
         for j in range(iterations):
+            # get gradient in each iteration
             grad = self.getGradient(newX, trainy)
+            # for each gradient get the sign, if gradient is 0 then sign is 0 too
             for i in range(len(grad)):
                 if grad[i] > 0:
                     grad[i] = 1
@@ -251,38 +256,53 @@ class LogisticReg:
                     grad[i] = -1
                 else:
                     grad[i] = 0
+            # send signs to parameter server, tag 2
             comm.Send(grad, dest=0, tag=2)
+            # receive majority voted signs from parameter server, tag 3
             comm.Recv(grad, source=0, tag=3)
-            self.W = self.W - alpha*grad
+            self.W = self.W - alpha*grad  # update weight vector for this particular worker
 
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-NUM_ITERATIONS = 10000
-ALPHA = 0.005
+# once again, go to readme first
+comm = MPI.COMM_WORLD  # initialize mpi
+rank = comm.Get_rank()  # get rank, in other words, worker number for this process
+NUM_ITERATIONS = 10000  # number of iterations on training data
+ALPHA = 0.005  # learning rate
 
 # parameter server
 if rank == 0:
-    LGobj = LogisticReg()
+    LGobj = LogisticReg()  # get a linear regression object for parameter server
+    # get a random weight vector including bias
     initialW = LGobj.getInitialW(NUM_FEATURES+1)
     LGobj.W = initialW
     comm.Send(initialW, dest=1, tag=1)  # tag is 1 for initial weight vector
     comm.Send(initialW, dest=2, tag=1)  # tag is 1 for initial weight vector
     for j in range(NUM_ITERATIONS):
-        #if j % 100 == 0:
+        # if j % 100 == 0: # use this for debugging to print number of iterations done
         #    print(j)
+
+        # get gradient signs of worker 1
         grad1 = np.empty(NUM_FEATURES+1, dtype=np.float64)
         comm.Recv(grad1, source=1, tag=2)
+        # get gradient signs of worker 2
         grad2 = np.empty(NUM_FEATURES+1, dtype=np.float64)
         comm.Recv(grad2, source=2, tag=2)
+
+        # vector of votes for gradient signs
         vote = np.zeros(NUM_FEATURES+1, dtype=np.float64)
         for i in range(NUM_FEATURES+1):
-            vote[i] = grad1[i]+grad2[i]
+            vote[i] = grad1[i]+grad2[i]  # will replace this with loop
+            if vote[i] > 0:
+                vote[i] = 1
+            elif vote[i] < 0:
+                vote[i] = -1
+            else:
+                vote[i] = 0
 
-        comm.Send(vote, dest=1, tag=3)
+        comm.Send(vote, dest=1, tag=3)  # send sign votes to all workers
         comm.Send(vote, dest=2, tag=3)
-        LGobj.W = LGobj.W-ALPHA*vote
-    print(LGobj.accuracy(X_test, y_test))
+        LGobj.W = LGobj.W-ALPHA*vote  # update the weight vector of server
+    print(LGobj.accuracy(X_test, y_test))  # print accuracy with test data
 
 # worker 1
 elif rank == 1:
