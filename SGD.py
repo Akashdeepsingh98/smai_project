@@ -144,10 +144,64 @@ class LogRegSGD:  # SIGNSGD
 #print("Sign SGD", accuracy_score(res, y_test))
 #print(confusion_matrix(y_test, res))
 # xcla.plot_accs(1000)
+
+class LogReg:
+    def __init__(self):
+        self.W = None
+
+    # method could be one vs one or one vs all
+    def train(self, X, y, alpha, epochs=100, iterations=2000):
+        N = X.shape[0]  # number of data points
+        Nfs = X.shape[1]+1  # number of features with a bias
+
+        self.W = np.random.rand(Nfs)  # random W vector with bias
+        newX = np.ones((N, Nfs))  # augment X for bias
+        newX[:, :-1] = X
+        X = newX
+
+        for i in range(epochs):
+            # print(i)
+            for j in range(iterations):
+                hx = np.dot(X, self.W)
+                hx = 1/(1+np.exp(-hx))
+                self.W = self.W - alpha*np.dot((hx-y).T, X)/N
+                hx[hx >= 0.5] = 1.0
+                hx[hx <= 0.5] = 0.0
+                count = np.count_nonzero(hx == y)
+                # print(count)
+                if count >= 0.98*N:
+                    break
+
+    def accuracy(self, testX, testy):
+        augx = np.ones((testX.shape[0], testX.shape[1]+1))
+        augx[:, :-1] = testX
+        prediction = np.dot(augx, self.W)
+        prediction = 1/(1+np.exp(-prediction))
+        prediction[prediction >= 0.5] = 1.0
+        prediction[prediction <= 0.5] = 0.0
+        count = np.count_nonzero(prediction == testy)
+        return count/testy.shape[0]
+
+    def predict(self, X):
+        augx = np.ones((X.shape[0], X.shape[1]+1))
+        augx[:, :-1] = X
+        prediction = np.dot(augx, self.W)
+        prediction = 1/(1+np.exp(-prediction))
+        prediction[prediction >= 0.5] = 1.0
+        prediction[prediction < 0.5] = 0.0
+        return prediction
+
+
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
-if rank==0:
-    pass 
-elif rank==1:
+# parameter server
+if rank == 0:
+    w1data = {'start': 0, 'end': X_train.shape[0]/2}
+    pass
+# worker 1
+elif rank == 1:
+    pass
+# worker 2
+elif rank == 3:
     pass
