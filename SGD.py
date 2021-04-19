@@ -7,8 +7,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 from sklearn.utils import shuffle
 import math
-import time
 
+# basic idea of how mpi works
 #comm = MPI.COMM_WORLD
 #rank = comm.Get_rank()
 #
@@ -32,7 +32,11 @@ cols = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Embarked']
 X = df[cols]
 y = df['Survived']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
-NUM_FEATURES = len(cols)
+X_train = X_train.to_numpy()
+X_test = X_test.to_numpy()
+y_train = y_train.to_numpy()
+y_test = y_test.to_numpy()
+NUM_FEATURES = len(cols)  # I will often add 1 to it for bias
 # print(X_train[:5])
 # exit()
 
@@ -146,7 +150,8 @@ class LogRegSGD:  # SIGNSGD
 #print(confusion_matrix(y_test, res))
 # xcla.plot_accs(1000)
 
-class LogReg:
+
+class LogReg:  # Ignore this class, just for reference
     def __init__(self):
         self.W = None
 
@@ -200,30 +205,95 @@ class LogisticReg:
     def getInitialW(self, numFeatures: int):
         return np.random.rand(numFeatures)
 
+    def sigmoid(self, x):
+        return(1/(1+np.exp(-x)))
+
+    def accuracy(self, testX, testy):
+        augx = np.ones((testX.shape[0], testX.shape[1]+1))
+        augx[:, :-1] = testX
+        prediction = np.dot(augx, self.W)
+        prediction = self.sigmoid(prediction)
+        prediction[prediction >= 0.5] = 1.0
+        prediction[prediction <= 0.5] = 0.0
+        count = np.count_nonzero(prediction == testy)
+        return count/testy.shape[0]
+
+    def predict(self, X):
+        augx = np.ones((X.shape[0], X.shape[1]+1))
+        augx[:, :-1] = X
+        prediction = np.dot(augx, self.W)
+        prediction = self.sigmoid(prediction)
+        prediction[prediction >= 0.5] = 1.0
+        prediction[prediction < 0.5] = 0.0
+        return prediction
+
+    def getGradient(self, X, y):
+        N = y.shape[0]
+        hx = np.dot(X, self.W)
+        hx = self.sigmoid(hx)
+        hx[hx >= 0.5] = 1
+        hx[hx <= 0.5] = 0
+        result = np.dot((hx-y).T, X)/N
+        return result
+
     def train(self, W, trainX, trainy, alpha, iterations=10000):
-        pass
+        self.W = W
+        N = trainX.shape[0]
+        newX = np.ones((N, NUM_FEATURES+1))
+        newX[:, :-1] = trainX
+
+        for j in range(iterations):
+            grad = self.getGradient(newX, trainy)
+            for i in range(len(grad)):
+                if grad[i] > 0:
+                    grad[i] = 1
+                elif grad[i] < 0:
+                    grad[i] = -1
+                else:
+                    grad[i] = 0
+            comm.Send(grad, dest=0, tag=2)
+            comm.Recv(grad, source=0, tag=3)
+            self.W = self.W - alpha*grad
 
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
+NUM_ITERATIONS = 10000
+ALPHA = 0.005
 
 # parameter server
 if rank == 0:
     LGobj = LogisticReg()
     initialW = LGobj.getInitialW(NUM_FEATURES+1)
-    #print('param server', initialW)
+    LGobj.W = initialW
     comm.Send(initialW, dest=1, tag=1)  # tag is 1 for initial weight vector
-    #print('param server', initialW)
     comm.Send(initialW, dest=2, tag=1)  # tag is 1 for initial weight vector
+    for j in range(NUM_ITERATIONS):
+        if j % 100 == 0:
+            print(j)
+        grad1 = np.empty(NUM_FEATURES+1, dtype=np.float64)
+        comm.Recv(grad1, source=1, tag=2)
+        grad2 = np.empty(NUM_FEATURES+1, dtype=np.float64)
+        comm.Recv(grad2, source=2, tag=2)
+        vote = np.zeros(NUM_FEATURES+1, dtype=np.float64)
+        for i in range(NUM_FEATURES+1):
+            vote[i] = grad1[i]+grad2[i]
+
+        comm.Send(vote, dest=1, tag=3)
+        comm.Send(vote, dest=2, tag=3)
+        LGobj.W = LGobj.W-ALPHA*vote
+    print(LGobj.accuracy(X_test, y_test))
 
 # worker 1
 elif rank == 1:
     initialW1 = np.empty(NUM_FEATURES+1, dtype=np.float64)
     comm.Recv(initialW1, source=0, tag=1)
-    #print('worker 1', initialW1)
+    LGw1 = LogisticReg()
+    LGw1.train(initialW1, X_train, y_train, ALPHA, NUM_ITERATIONS)
 
 # worker 2
 elif rank == 2:
     initialW2 = np.empty(NUM_FEATURES+1, dtype=np.float64)
     comm.Recv(initialW2, source=0, tag=1)
-    #print('worker 2', initialW2)
+    LGw2 = LogisticReg()
+    LGw2.train(initialW2, X_train, y_train, ALPHA, NUM_ITERATIONS)
