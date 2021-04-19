@@ -1,4 +1,13 @@
 from mpi4py import MPI
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+from sklearn.utils import shuffle
+import math
+import time
 
 #comm = MPI.COMM_WORLD
 #rank = comm.Get_rank()
@@ -8,15 +17,6 @@ from mpi4py import MPI
 #    comm.send(data, dest=1, tag=11)
 # elif rank == 1:
 #    data = comm.recv(source=0, tag=11)
-
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import confusion_matrix
-from sklearn.utils import shuffle
-import math
 
 df = pd.read_csv('titanic.csv')
 
@@ -32,7 +32,8 @@ cols = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Embarked']
 X = df[cols]
 y = df['Survived']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
-# print(X.head())
+NUM_FEATURES = len(cols)
+# print(X_train[:5])
 # exit()
 
 
@@ -192,16 +193,37 @@ class LogReg:
         return prediction
 
 
+class LogisticReg:
+    def __init__(self):
+        self.W = None
+
+    def getInitialW(self, numFeatures: int):
+        return np.random.rand(numFeatures)
+
+    def train(self, W, trainX, trainy, alpha, iterations=10000):
+        pass
+
+
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 # parameter server
 if rank == 0:
-    w1data = {'start': 0, 'end': X_train.shape[0]/2}
-    pass
+    LGobj = LogisticReg()
+    initialW = LGobj.getInitialW(NUM_FEATURES+1)
+    #print('param server', initialW)
+    comm.Send(initialW, dest=1, tag=1)  # tag is 1 for initial weight vector
+    #print('param server', initialW)
+    comm.Send(initialW, dest=2, tag=1)  # tag is 1 for initial weight vector
+
 # worker 1
 elif rank == 1:
-    pass
+    initialW1 = np.empty(NUM_FEATURES+1, dtype=np.float64)
+    comm.Recv(initialW1, source=0, tag=1)
+    #print('worker 1', initialW1)
+
 # worker 2
-elif rank == 3:
-    pass
+elif rank == 2:
+    initialW2 = np.empty(NUM_FEATURES+1, dtype=np.float64)
+    comm.Recv(initialW2, source=0, tag=1)
+    #print('worker 2', initialW2)
