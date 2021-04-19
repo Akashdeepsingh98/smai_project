@@ -269,8 +269,8 @@ if rank == 0:
     comm.Send(initialW, dest=1, tag=1)  # tag is 1 for initial weight vector
     comm.Send(initialW, dest=2, tag=1)  # tag is 1 for initial weight vector
     for j in range(NUM_ITERATIONS):
-        if j % 100 == 0:
-            print(j)
+        #if j % 100 == 0:
+        #    print(j)
         grad1 = np.empty(NUM_FEATURES+1, dtype=np.float64)
         comm.Recv(grad1, source=1, tag=2)
         grad2 = np.empty(NUM_FEATURES+1, dtype=np.float64)
