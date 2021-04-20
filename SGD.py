@@ -202,6 +202,8 @@ class LogReg:  # Ignore this class, just for reference
 class LogisticReg:  # the class we are using
     def __init__(self):  # weight vector belonging to this class
         self.W = None
+        self.accs = []
+        self.num_iterations = 0
 
     # get a randomly generated weight vector once for parameter server which also includes bias
     def getInitialW(self, numFeatures: int):
@@ -236,18 +238,19 @@ class LogisticReg:  # the class we are using
         hx[hx >= 0.5] = 1
         hx[hx <= 0.5] = 0
         result = np.dot((hx-y).T, X)/N
-        return result
+        return result, hx
 
     def train(self, W, trainX, trainy, alpha, iterations=10000):  # train on training data
         self.W = W  # take weight vector from parameter server initially
         N = trainX.shape[0]  # number of data points
         # one more column of only ones attached to training data for bias
+        self.num_iterations = iterations
         newX = np.ones((N, NUM_FEATURES+1))
         newX[:, :-1] = trainX
 
         for j in range(iterations):
             # get gradient in each iteration
-            grad = self.getGradient(newX, trainy)
+            grad, hx = self.getGradient(newX, trainy)
             # for each gradient get the sign, if gradient is 0 then sign is 0 too
             for i in range(len(grad)):
                 if grad[i] > 0:
@@ -261,6 +264,21 @@ class LogisticReg:  # the class we are using
             # receive majority voted signs from parameter server, tag 3
             comm.Recv(grad, source=0, tag=3)
             self.W = self.W - alpha*grad  # update weight vector for this particular worker
+
+    def plot_accs(self, step_size=500):
+        x_data = []
+        y_data = []
+        print(len(self.accs))
+        for i in range(1, self.num_iterations+1, step_size):
+            x_data.append(i)
+            y_data.append(self.accs[i-1])
+        x_data.append(self.num_iterations)
+        y_data.append(self.accs[-1])
+        plt.plot(x_data, y_data)
+        plt.xticks(x_data)
+        plt.xlabel('Number of iterations')
+        plt.ylabel('Accuracy')
+        plt.show()
 
 
 # once again, go to readme first
@@ -303,6 +321,8 @@ if rank == 0:
         comm.Send(vote, dest=2, tag=3)
         LGobj.W = LGobj.W-ALPHA*vote  # update the weight vector of server
     print(LGobj.accuracy(X_test, y_test))  # print accuracy with test data
+    print('Confusion Matrix: ')
+    print(confusion_matrix(y_test, LGobj.predict(X_test)))
 
 # worker 1
 elif rank == 1:
