@@ -1,16 +1,19 @@
 from sklearn.datasets import fetch_openml
-#from tensorflow import keras 
-from keras.utils.np_utils import to_categorical
+#from tensorflow import keras
+#from keras.utils.np_utils import to_categorical
 import numpy as np
 from sklearn.model_selection import train_test_split
 import time
+from mpi4py import MPI
+import pandas as pd 
 
-x, y = fetch_openml('mnist_784', version=1, return_X_y=True)
-x = (x/255).astype('float32')
-y = to_categorical(y)
+#x, y = fetch_openml('mnist_784', version=1, return_X_y=True)
+#x = (x/255).astype('float32')
+#y = to_categorical(y)
+#
+# x_train, x_val, y_train, y_val = train_test_split(
+#    x, y, test_size=0.15, random_state=42)
 
-x_train, x_val, y_train, y_val = train_test_split(
-    x, y, test_size=0.15, random_state=42)
 
 class DeepNeuralNetwork():
     def __init__(self, sizes, epochs=20, l_rate=0.001):
@@ -35,15 +38,15 @@ class DeepNeuralNetwork():
 
     def initialization(self):
         # number of nodes in each layer
-        input_layer=self.sizes[0]
-        hidden_1=self.sizes[1]
-        hidden_2=self.sizes[2]
-        output_layer=self.sizes[3]
+        input_layer = self.sizes[0]
+        hidden_1 = self.sizes[1]
+        hidden_2 = self.sizes[2]
+        output_layer = self.sizes[3]
 
         params = {
-            'W1':np.random.randn(hidden_1, input_layer) * np.sqrt(1. / hidden_1),
-            'W2':np.random.randn(hidden_2, hidden_1) * np.sqrt(1. / hidden_2),
-            'W3':np.random.randn(output_layer, hidden_2) * np.sqrt(1. / output_layer)
+            'W1': np.random.randn(hidden_1, input_layer) * np.sqrt(1. / hidden_1),
+            'W2': np.random.randn(hidden_2, hidden_1) * np.sqrt(1. / hidden_2),
+            'W3': np.random.randn(output_layer, hidden_2) * np.sqrt(1. / output_layer)
         }
 
         return params
@@ -75,7 +78,7 @@ class DeepNeuralNetwork():
 
             Note: There is a stability issue that causes warnings. This is 
                   caused  by the dot and multiply operations on the huge arrays.
-                  
+
                   RuntimeWarning: invalid value encountered in true_divide
                   RuntimeWarning: overflow encountered in exp
                   RuntimeWarning: overflow encountered in square
@@ -84,15 +87,18 @@ class DeepNeuralNetwork():
         change_w = {}
 
         # Calculate W3 update
-        error = 2 * (output - y_train) / output.shape[0] * self.softmax(params['Z3'], derivative=True)
+        error = 2 * (output - y_train) / \
+            output.shape[0] * self.softmax(params['Z3'], derivative=True)
         change_w['W3'] = np.outer(error, params['A2'])
 
         # Calculate W2 update
-        error = np.dot(params['W3'].T, error) * self.sigmoid(params['Z2'], derivative=True)
+        error = np.dot(params['W3'].T, error) * \
+            self.sigmoid(params['Z2'], derivative=True)
         change_w['W2'] = np.outer(error, params['A1'])
 
         # Calculate W1 update
-        error = np.dot(params['W2'].T, error) * self.sigmoid(params['Z1'], derivative=True)
+        error = np.dot(params['W2'].T, error) * \
+            self.sigmoid(params['Z1'], derivative=True)
         change_w['W1'] = np.outer(error, params['A0'])
 
         return change_w
@@ -108,7 +114,7 @@ class DeepNeuralNetwork():
                 gradient ∇J(x, y):  the gradient of the objective function,
                                     i.e. the change for a specific theta θ
         '''
-        
+
         for key, value in changes_to_w.items():
             self.params[key] -= self.l_rate * value
 
@@ -124,21 +130,68 @@ class DeepNeuralNetwork():
             output = self.forward_pass(x)
             pred = np.argmax(output)
             predictions.append(pred == np.argmax(y))
-        
+
         return np.mean(predictions)
 
     def train(self, x_train, y_train, x_val, y_val):
         start_time = time.time()
         for iteration in range(self.epochs):
-            for x,y in zip(x_train, y_train):
+            for x, y in zip(x_train, y_train):
                 output = self.forward_pass(x)
                 changes_to_w = self.backward_pass(y, output)
                 self.update_network_parameters(changes_to_w)
-            
+
             accuracy = self.compute_accuracy(x_val, y_val)
             print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
                 iteration+1, time.time() - start_time, accuracy * 100
             ))
 
-dnn = DeepNeuralNetwork(sizes=[784, 128, 64, 10])
-dnn.train(x_train, y_train, x_val, y_val)
+
+#dnn = DeepNeuralNetwork(sizes=[784, 128, 64, 10])
+#dnn.train(x_train, y_train, x_val, y_val)
+
+comm = MPI.COMM_WORLD  # initialize mpi
+rank = comm.Get_rank()  # get rank, in other words, worker number for this process
+EPOCHS = 20  # global number of epochs
+L_RATE = 0.001  # global learning rate
+SIZES = [784, 128, 64, 10]
+
+if rank == 0:
+    mainNN = DeepNeuralNetwork(
+        sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    comm.Send(mainNN.params['W1'], dest=1, tag=1)
+    comm.Send(mainNN.params['W2'], dest=1, tag=2)
+    comm.Send(mainNN.params['W3'], dest=1, tag=3)
+    #print('On ps')
+    # print(mainNN.params['W1'])
+    comm.Send(mainNN.params['W1'], dest=2, tag=1)
+    comm.Send(mainNN.params['W2'], dest=2, tag=2)
+    comm.Send(mainNN.params['W3'], dest=2, tag=3)
+    comm.Send(mainNN.params['W1'], dest=3, tag=1)
+    comm.Send(mainNN.params['W2'], dest=3, tag=2)
+    comm.Send(mainNN.params['W3'], dest=3, tag=3)
+#    for epoch in range(EPOCHS):
+#        for i in range(len(x_train)):
+#            pass
+
+elif rank == 1:
+    nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    #temp = np.empty((128, 784), dtype=np.float64)
+    comm.Recv(nn1.params['W1'], source=0, tag=1)
+    comm.Recv(nn1.params['W2'], source=0, tag=2)
+    comm.Recv(nn1.params['W3'], source=0, tag=3)
+    #print('on nn1')
+    # print(nn1.params['W1'])
+    #nn1.train(x_train, y_train, x_val, y_val)
+elif rank == 2:
+    nn2 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    comm.Recv(nn2.params['W1'], source=0, tag=1)
+    comm.Recv(nn2.params['W2'], source=0, tag=2)
+    comm.Recv(nn2.params['W3'], source=0, tag=3)
+    #nn2.train(x_train, y_train, x_val, y_val)
+elif rank == 3:
+    nn3 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    comm.Recv(nn3.params['W1'], source=0, tag=1)
+    comm.Recv(nn3.params['W2'], source=0, tag=2)
+    comm.Recv(nn3.params['W3'], source=0, tag=3)
+    #nn3.train(x_train, y_train, x_val, y_val)
