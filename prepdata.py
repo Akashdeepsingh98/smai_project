@@ -16,7 +16,7 @@ Y = to_categorical(Y)
 x_train, x_test, y_train, y_test = train_test_split(
     X, Y, test_size=0.15, random_state=42)
 
-x_train.tofile('x_train.csv', sep=',')
-x_test.tofile('x_test.csv', sep=',')
-y_train.tofile('y_train.csv', sep=',')
-y_test.tofile('y_test.csv', sep=',')
+np.savetxt('x_train.csv', x_train, delimiter=',')
+np.savetxt('x_test.csv', x_test, delimiter=',')
+np.savetxt('y_train.csv', y_train, delimiter=',')
+np.savetxt('y_test.csv', y_test, delimiter=',')
