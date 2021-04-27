@@ -1,11 +1,8 @@
 from sklearn.datasets import fetch_openml
-#from tensorflow import keras
-#from keras.utils.np_utils import to_categorical
 import numpy as np
-from sklearn.model_selection import train_test_split
 import time
 from mpi4py import MPI
-import pandas as pd 
+import pandas as pd
 
 #x, y = fetch_openml('mnist_784', version=1, return_X_y=True)
 #x = (x/255).astype('float32')
@@ -13,6 +10,12 @@ import pandas as pd
 #
 # x_train, x_val, y_train, y_val = train_test_split(
 #    x, y, test_size=0.15, random_state=42)
+
+# now loading data from the csv files
+x_train = np.loadtxt('x_train.csv', delimiter=',')
+x_val = np.loadtxt('x_test.csv', delimiter=',')
+y_train = np.loadtxt('y_train.csv', delimiter=',')
+y_val = np.loadtxt('y_test.csv', delimiter=',')
 
 
 class DeepNeuralNetwork():
@@ -170,9 +173,62 @@ if rank == 0:
     comm.Send(mainNN.params['W1'], dest=3, tag=1)
     comm.Send(mainNN.params['W2'], dest=3, tag=2)
     comm.Send(mainNN.params['W3'], dest=3, tag=3)
-#    for epoch in range(EPOCHS):
-#        for i in range(len(x_train)):
-#            pass
+    
+    for epoch in range(EPOCHS):
+        for i in range(len(x_train)):
+            # grad signs of worker 1, W1
+            grad11 = np.empty(mainNN.params['W1'].shape)
+            comm.Recv(grad11, source=1, tag=4)
+            # grad signs of worker 1, W2
+            grad12 = np.empty(mainNN.params['W2'].shape)
+            comm.Recv(grad12, source=1, tag=5)
+            # grad signs of worker 1, W3
+            grad13 = np.empty(mainNN.params['W3'].shape)
+            comm.Recv(grad13, source=1, tag=6)
+            # grad signs of worker 2, W1
+            grad21 = np.empty(mainNN.params['W1'].shape)
+            comm.Recv(grad21, source=2, tag=4)
+            grad22 = np.empty(mainNN.params['W2'].shape)  # and so on
+            comm.Recv(grad22, source=2, tag=5)
+            grad23 = np.empty(mainNN.params['W3'].shape)
+            comm.Recv(grad23, source=2, tag=6)
+            grad31 = np.empty(mainNN.params['W1'].shape)
+            comm.Recv(grad31, source=3, tag=4)
+            grad32 = np.empty(mainNN.params['W2'].shape)
+            comm.Recv(grad32, source=3, tag=5)
+            grad33 = np.empty(mainNN.params['W3'].shape)
+            comm.Recv(grad33, source=3, tag=6)
+
+            vote1 = np.zeros(mainNN.params['W1'])
+            vote2 = np.zeros(mainNN.params['W2'])
+            vote3 = np.zeros(mainNN.params['W3'])
+
+            vote1 = grad11+grad21+grad31
+            vote2 = grad12+grad22+grad32
+            vote3 = grad13+grad23+grad33
+
+            vote1[vote1 > 0] = 1
+            vote1[vote1 < 0] = -1
+            vote1[vote1 == 0] = 0
+            vote2[vote2 > 0] = 1
+            vote2[vote2 < 0] = -1
+            vote2[vote2 == 0] = 0
+            vote3[vote3 > 0] = 1
+            vote3[vote3 < 0] = -1
+            vote3[vote3 == 0] = 0
+
+            comm.Send(vote1, dest=1, tag=7)
+            comm.Send(vote1, dest=2, tag=7)
+            comm.Send(vote1, dest=3, tag=7)
+            comm.Send(vote2, dest=1, tag=8)
+            comm.Send(vote2, dest=2, tag=8)
+            comm.Send(vote2, dest=3, tag=8)
+            comm.Send(vote3, dest=1, tag=9)
+            comm.Send(vote3, dest=2, tag=9)
+            comm.Send(vote3, dest=3, tag=9)
+
+            mainNN.update_network_parameters({'Z1':vote1})
+
 
 elif rank == 1:
     nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
