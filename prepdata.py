@@ -14,7 +14,7 @@ X = X.astype('float32')/255.0
 Y = to_categorical(Y)
 
 x_train, x_test, y_train, y_test = train_test_split(
-    X, Y, test_size=0.15, random_state=42)
+    X, Y, test_size=10000, random_state=42)
 
 np.savetxt('x_train.csv', x_train, delimiter=',')
 np.savetxt('x_test.csv', x_test, delimiter=',')

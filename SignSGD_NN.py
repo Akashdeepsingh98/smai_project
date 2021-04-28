@@ -100,9 +100,7 @@ class DeepNeuralNetwork():
         grad3[grad3 == 0] = 0
         comm.Send(grad3, dest=0, tag=6)
         comm.Recv(grad3, source=0, tag=9)
-        #error = grad3
         change_w['W3'] = grad3
-        #print('rank1 ', grad3.nbytes)
 
         # Calculate W2 update
         error = grad2 = np.dot(params['W3'].T, error) * \
@@ -113,9 +111,7 @@ class DeepNeuralNetwork():
         grad2[grad2 == 0] = 0
         comm.Send(grad2, dest=0, tag=5)
         comm.Recv(grad2, source=0, tag=8)
-        #error = grad2
         change_w['W2'] = grad2
-        #print('rank1 ', grad2.nbytes)
 
         # Calculate W1 update
         error = grad1 = np.dot(params['W2'].T, error) * \
@@ -126,9 +122,7 @@ class DeepNeuralNetwork():
         grad1[grad1 == 0] = 0
         comm.Send(grad1, dest=0, tag=4)
         comm.Recv(grad1, source=0, tag=7)
-        #error = grad1
         change_w['W1'] = grad1
-        #print('rank1 ', grad2.nbytes)
 
         return change_w
 
@@ -169,21 +163,24 @@ class DeepNeuralNetwork():
                 output = self.forward_pass(x)
                 changes_to_w = self.backward_pass(y, output)
                 self.update_network_parameters(changes_to_w)
-
+            # for i in range(len(x_train)//MINI_BATCH_SIZE):
+            #    output = self.forward_pass(
+            #        x_train[:,i*MINI_BATCH_SIZE:(i+1)*MINI_BATCH_SIZE])
+            #    changes_to_w = self.backward_pass(
+            #        y_train[i*MINI_BATCH_SIZE:(i+1)*MINI_BATCH_SIZE].T, output)
+            #    self.update_network_parameters(changes_to_w)
             #accuracy = self.compute_accuracy(x_val, y_val)
             # print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
             #    iteration+1, time.time() - start_time, accuracy * 100
             # ))
 
 
-#dnn = DeepNeuralNetwork(sizes=[784, 128, 64, 10])
-#dnn.train(x_train, y_train, x_val, y_val)
-
 comm = MPI.COMM_WORLD  # initialize mpi
 rank = comm.Get_rank()  # get rank, in other words, worker number for this process
 EPOCHS = 20  # global number of epochs
-L_RATE = 0.001  # global learning rate
+L_RATE = 0.000005  # global learning rate
 SIZES = [784, 128, 64, 10]
+MINI_BATCH_SIZE = 100
 
 if rank == 0:
     mainNN = DeepNeuralNetwork(
@@ -191,8 +188,7 @@ if rank == 0:
     comm.Send(mainNN.params['W1'], dest=1, tag=1)
     comm.Send(mainNN.params['W2'], dest=1, tag=2)
     comm.Send(mainNN.params['W3'], dest=1, tag=3)
-    #print('On ps')
-    # print(mainNN.params['W1'])
+
     comm.Send(mainNN.params['W1'], dest=2, tag=1)
     comm.Send(mainNN.params['W2'], dest=2, tag=2)
     comm.Send(mainNN.params['W3'], dest=2, tag=3)
@@ -200,24 +196,17 @@ if rank == 0:
     comm.Send(mainNN.params['W2'], dest=3, tag=2)
     comm.Send(mainNN.params['W3'], dest=3, tag=3)
 
-    # print(mainNN.params['W1'].shape)
-    # print(mainNN.params['W2'].shape)
-    # print(mainNN.params['W3'].shape)
     print('Starting loops')
     for epoch in range(EPOCHS):
-        for i in range(len(x_train)):
-            if i%100==0:
-                print(i)
+        for i in range(20000):
+            # if i % 1000 == 0:
+            #    print(i)
             grad13 = np.empty(mainNN.params['W3'].shape, dtype='float64')
             comm.Recv(grad13, source=1, tag=6)
             grad23 = np.empty(mainNN.params['W3'].shape, dtype='float64')
             comm.Recv(grad23, source=2, tag=6)
             grad33 = np.empty(mainNN.params['W3'].shape, dtype='float64')
             comm.Recv(grad33, source=3, tag=6)
-
-            #print('rank0 ', grad13.nbytes)
-            # print(grad23.shape)
-            # print(grad33.shape)
             vote3 = grad13+grad23+grad33
             vote3[vote3 > 0] = 1
             vote3[vote3 < 0] = -1
@@ -225,17 +214,12 @@ if rank == 0:
             comm.Send(vote3, dest=1, tag=9)
             comm.Send(vote3, dest=2, tag=9)
             comm.Send(vote3, dest=3, tag=9)
-
             grad12 = np.empty(mainNN.params['W2'].shape, dtype='float64')
             comm.Recv(grad12, source=1, tag=5)
             grad22 = np.empty(mainNN.params['W2'].shape, dtype='float64')
             comm.Recv(grad22, source=2, tag=5)
             grad32 = np.empty(mainNN.params['W2'].shape, dtype='float64')
             comm.Recv(grad32, source=3, tag=5)
-
-            #print('rank0 ', grad12.nbytes)
-            # print(grad22.shape)
-            # print(grad32.shape)
             vote2 = grad12+grad22+grad32
             vote2[vote2 > 0] = 1
             vote2[vote2 < 0] = -1
@@ -243,17 +227,12 @@ if rank == 0:
             comm.Send(vote2, dest=1, tag=8)
             comm.Send(vote2, dest=2, tag=8)
             comm.Send(vote2, dest=3, tag=8)
-
             grad11 = np.empty(mainNN.params['W1'].shape, dtype='float64')
             comm.Recv(grad11, source=1, tag=4)
             grad21 = np.empty(mainNN.params['W1'].shape, dtype='float64')
             comm.Recv(grad21, source=2, tag=4)
             grad31 = np.empty(mainNN.params['W1'].shape, dtype='float64')
             comm.Recv(grad31, source=3, tag=4)
-
-            #print('rank0 ', grad11.nbytes)
-            # print(grad21.shape)
-            # print(grad31.shape)
             vote1 = grad11+grad21+grad31
             vote1[vote1 > 0] = 1
             vote1[vote1 < 0] = -1
@@ -277,6 +256,8 @@ elif rank == 1:
     print('Start rank 1')
     #print('on nn1')
     # print(nn1.params['W1'])
+    x_train = x_train[:20000]
+    y_train = y_train[:20000]
     nn1.train(x_train, y_train)
 elif rank == 2:
     print('Start rank 2')
@@ -285,6 +266,8 @@ elif rank == 2:
     comm.Recv(nn2.params['W2'], source=0, tag=2)
     comm.Recv(nn2.params['W3'], source=0, tag=3)
     print('Start rank 2')
+    x_train = x_train[20000:40000]
+    y_train = y_train[20000:40000]
     nn2.train(x_train, y_train)
 elif rank == 3:
     print('Start rank 3')
@@ -293,4 +276,6 @@ elif rank == 3:
     comm.Recv(nn3.params['W2'], source=0, tag=2)
     comm.Recv(nn3.params['W3'], source=0, tag=3)
     print('Start rank 3')
+    x_train = x_train[40000:]
+    y_train = y_train[40000:]
     nn3.train(x_train, y_train)
