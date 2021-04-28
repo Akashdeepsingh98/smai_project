@@ -16,6 +16,7 @@ x_train = np.loadtxt('x_train.csv', delimiter=',')
 x_val = np.loadtxt('x_test.csv', delimiter=',')
 y_train = np.loadtxt('y_train.csv', delimiter=',')
 y_val = np.loadtxt('y_test.csv', delimiter=',')
+print('read data')
 
 
 class DeepNeuralNetwork():
@@ -91,34 +92,43 @@ class DeepNeuralNetwork():
 
         # communicate all 3 gradients one by one
         # Calculate W3 update
-        grad3 = self.softmax(params['Z3'], derivative=True)
+        error = grad3 = 2 * (output - y_train) / \
+            output.shape[0] * self.softmax(params['Z3'], derivative=True)
+        grad3 = np.outer(grad3, params['A2'])
         grad3[grad3 > 0] = 1
         grad3[grad3 < 0] = -1
         grad3[grad3 == 0] = 0
         comm.Send(grad3, dest=0, tag=6)
         comm.Recv(grad3, source=0, tag=9)
-        error = 2 * (output - y_train) / output.shape[0] * grad3
-        change_w['W3'] = np.outer(error, params['A2'])
+        #error = grad3
+        change_w['W3'] = grad3
+        #print('rank1 ', grad3.nbytes)
 
         # Calculate W2 update
-        grad2 = self.softmax(params['Z2'], derivative=True)
+        error = grad2 = np.dot(params['W3'].T, error) * \
+            self.sigmoid(params['Z2'], derivative=True)
+        grad2 = np.outer(grad2, params['A1'])
         grad2[grad2 > 0] = 1
         grad2[grad2 < 0] = -1
         grad2[grad2 == 0] = 0
         comm.Send(grad2, dest=0, tag=5)
         comm.Recv(grad2, source=0, tag=8)
-        error = np.dot(params['W3'].T, error) * grad2
-        change_w['W2'] = np.outer(error, params['A1'])
+        #error = grad2
+        change_w['W2'] = grad2
+        #print('rank1 ', grad2.nbytes)
 
         # Calculate W1 update
-        grad1 = self.softmax(params['Z3'], derivative=True)
+        error = grad1 = np.dot(params['W2'].T, error) * \
+            self.sigmoid(params['Z1'], derivative=True)
+        grad1 = np.outer(grad1, params['A0'])
         grad1[grad1 > 0] = 1
         grad1[grad1 < 0] = -1
         grad1[grad1 == 0] = 0
         comm.Send(grad1, dest=0, tag=4)
         comm.Recv(grad1, source=0, tag=7)
-        error = np.dot(params['W2'].T, error) * grad1
-        change_w['W1'] = np.outer(error, params['A0'])
+        #error = grad1
+        change_w['W1'] = grad1
+        #print('rank1 ', grad2.nbytes)
 
         return change_w
 
@@ -152,7 +162,7 @@ class DeepNeuralNetwork():
 
         return np.mean(predictions)
 
-    def train(self, x_train, y_train, x_val, y_val):
+    def train(self, x_train, y_train):
         start_time = time.time()
         for iteration in range(self.epochs):
             for x, y in zip(x_train, y_train):
@@ -190,15 +200,24 @@ if rank == 0:
     comm.Send(mainNN.params['W2'], dest=3, tag=2)
     comm.Send(mainNN.params['W3'], dest=3, tag=3)
 
+    # print(mainNN.params['W1'].shape)
+    # print(mainNN.params['W2'].shape)
+    # print(mainNN.params['W3'].shape)
+    print('Starting loops')
     for epoch in range(EPOCHS):
         for i in range(len(x_train)):
-            grad13 = np.empty(SIZES[3])
+            if i%100==0:
+                print(i)
+            grad13 = np.empty(mainNN.params['W3'].shape, dtype='float64')
             comm.Recv(grad13, source=1, tag=6)
-            grad23 = np.empty(SIZES[3])
+            grad23 = np.empty(mainNN.params['W3'].shape, dtype='float64')
             comm.Recv(grad23, source=2, tag=6)
-            grad33 = np.empty(SIZES[3])
+            grad33 = np.empty(mainNN.params['W3'].shape, dtype='float64')
             comm.Recv(grad33, source=3, tag=6)
 
+            #print('rank0 ', grad13.nbytes)
+            # print(grad23.shape)
+            # print(grad33.shape)
             vote3 = grad13+grad23+grad33
             vote3[vote3 > 0] = 1
             vote3[vote3 < 0] = -1
@@ -207,13 +226,16 @@ if rank == 0:
             comm.Send(vote3, dest=2, tag=9)
             comm.Send(vote3, dest=3, tag=9)
 
-            grad12 = np.empty(SIZES[2])
+            grad12 = np.empty(mainNN.params['W2'].shape, dtype='float64')
             comm.Recv(grad12, source=1, tag=5)
-            grad22 = np.empty(SIZES[2])
+            grad22 = np.empty(mainNN.params['W2'].shape, dtype='float64')
             comm.Recv(grad22, source=2, tag=5)
-            grad32 = np.empty(SIZES[2])
+            grad32 = np.empty(mainNN.params['W2'].shape, dtype='float64')
             comm.Recv(grad32, source=3, tag=5)
 
+            #print('rank0 ', grad12.nbytes)
+            # print(grad22.shape)
+            # print(grad32.shape)
             vote2 = grad12+grad22+grad32
             vote2[vote2 > 0] = 1
             vote2[vote2 < 0] = -1
@@ -222,13 +244,16 @@ if rank == 0:
             comm.Send(vote2, dest=2, tag=8)
             comm.Send(vote2, dest=3, tag=8)
 
-            grad11 = np.empty(SIZES[1])
+            grad11 = np.empty(mainNN.params['W1'].shape, dtype='float64')
             comm.Recv(grad11, source=1, tag=4)
-            grad21 = np.empty(SIZES[1])
+            grad21 = np.empty(mainNN.params['W1'].shape, dtype='float64')
             comm.Recv(grad21, source=2, tag=4)
-            grad31 = np.empty(SIZES[1])
+            grad31 = np.empty(mainNN.params['W1'].shape, dtype='float64')
             comm.Recv(grad31, source=3, tag=4)
 
+            #print('rank0 ', grad11.nbytes)
+            # print(grad21.shape)
+            # print(grad31.shape)
             vote1 = grad11+grad21+grad31
             vote1[vote1 > 0] = 1
             vote1[vote1 < 0] = -1
@@ -236,29 +261,36 @@ if rank == 0:
             comm.Send(vote1, dest=1, tag=7)
             comm.Send(vote1, dest=2, tag=7)
             comm.Send(vote1, dest=3, tag=7)
-            mainNN.update_network_parameters({})
+            mainNN.update_network_parameters(
+                {'W1': vote1, 'W2': vote2, 'W3': vote3})
 
         print('Epochs: {}'.format(epoch+1))
         print(mainNN.compute_accuracy(x_val, y_val))
 
 elif rank == 1:
+    print('Start rank 1')
     nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     #temp = np.empty((128, 784), dtype=np.float64)
     comm.Recv(nn1.params['W1'], source=0, tag=1)
     comm.Recv(nn1.params['W2'], source=0, tag=2)
     comm.Recv(nn1.params['W3'], source=0, tag=3)
+    print('Start rank 1')
     #print('on nn1')
     # print(nn1.params['W1'])
-    #nn1.train(x_train, y_train, x_val, y_val)
+    nn1.train(x_train, y_train)
 elif rank == 2:
+    print('Start rank 2')
     nn2 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Recv(nn2.params['W1'], source=0, tag=1)
     comm.Recv(nn2.params['W2'], source=0, tag=2)
     comm.Recv(nn2.params['W3'], source=0, tag=3)
-    #nn2.train(x_train, y_train, x_val, y_val)
+    print('Start rank 2')
+    nn2.train(x_train, y_train)
 elif rank == 3:
+    print('Start rank 3')
     nn3 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Recv(nn3.params['W1'], source=0, tag=1)
     comm.Recv(nn3.params['W2'], source=0, tag=2)
     comm.Recv(nn3.params['W3'], source=0, tag=3)
-    #nn3.train(x_train, y_train, x_val, y_val)
+    print('Start rank 3')
+    nn3.train(x_train, y_train)
