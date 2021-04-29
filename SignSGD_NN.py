@@ -247,35 +247,35 @@ if rank == 0:
         print(mainNN.compute_accuracy(x_val, y_val))
 
 elif rank == 1:
-    print('Start rank 1')
+    #print('Start rank 1')
     nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     #temp = np.empty((128, 784), dtype=np.float64)
     comm.Recv(nn1.params['W1'], source=0, tag=1)
     comm.Recv(nn1.params['W2'], source=0, tag=2)
     comm.Recv(nn1.params['W3'], source=0, tag=3)
-    print('Start rank 1')
+    #print('Start rank 1')
     #print('on nn1')
     # print(nn1.params['W1'])
     x_train = x_train[:20000]
     y_train = y_train[:20000]
     nn1.train(x_train, y_train)
 elif rank == 2:
-    print('Start rank 2')
+    #print('Start rank 2')
     nn2 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Recv(nn2.params['W1'], source=0, tag=1)
     comm.Recv(nn2.params['W2'], source=0, tag=2)
     comm.Recv(nn2.params['W3'], source=0, tag=3)
-    print('Start rank 2')
+    #print('Start rank 2')
     x_train = x_train[20000:40000]
     y_train = y_train[20000:40000]
     nn2.train(x_train, y_train)
 elif rank == 3:
-    print('Start rank 3')
+    #print('Start rank 3')
     nn3 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Recv(nn3.params['W1'], source=0, tag=1)
     comm.Recv(nn3.params['W2'], source=0, tag=2)
     comm.Recv(nn3.params['W3'], source=0, tag=3)
-    print('Start rank 3')
+    #print('Start rank 3')
     x_train = x_train[40000:]
     y_train = y_train[40000:]
     nn3.train(x_train, y_train)
