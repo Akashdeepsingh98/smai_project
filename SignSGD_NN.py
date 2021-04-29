@@ -3,6 +3,7 @@ import numpy as np
 import time
 from mpi4py import MPI
 import pandas as pd
+from matplotlib import pyplot as plt
 
 #x, y = fetch_openml('mnist_784', version=1, return_X_y=True)
 #x = (x/255).astype('float32')
@@ -16,7 +17,7 @@ x_train = np.loadtxt('x_train.csv', delimiter=',')
 x_val = np.loadtxt('x_test.csv', delimiter=',')
 y_train = np.loadtxt('y_train.csv', delimiter=',')
 y_val = np.loadtxt('y_test.csv', delimiter=',')
-print('read data')
+#print('read data')
 
 
 class DeepNeuralNetwork():
@@ -27,6 +28,7 @@ class DeepNeuralNetwork():
 
         # we save all parameters in the neural network in this dictionary
         self.params = self.initialization()
+        self.accs = []
 
     def sigmoid(self, x, derivative=False):
         if derivative:
@@ -174,15 +176,23 @@ class DeepNeuralNetwork():
             #    iteration+1, time.time() - start_time, accuracy * 100
             # ))
 
+    def plot_accs(self):
+        plt.plot(list(range(1, self.epochs+1)), self.accs)
+        plt.xticks(list(range(1, self.epochs+1)))
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy')
+        plt.show()
+
 
 comm = MPI.COMM_WORLD  # initialize mpi
 rank = comm.Get_rank()  # get rank, in other words, worker number for this process
-EPOCHS = 20  # global number of epochs
-L_RATE = 0.000005  # global learning rate
+EPOCHS = 16  # global number of epochs
+L_RATE = 0.000001  # global learning rate
 SIZES = [784, 128, 64, 10]
 MINI_BATCH_SIZE = 100
 
 if rank == 0:
+    accs = []
     mainNN = DeepNeuralNetwork(
         sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Send(mainNN.params['W1'], dest=1, tag=1)
@@ -245,6 +255,9 @@ if rank == 0:
 
         print('Epochs: {}'.format(epoch+1))
         print(mainNN.compute_accuracy(x_val, y_val))
+        accs.append(mainNN.compute_accuracy(x_val, y_val))
+    mainNN.accs = accs 
+    mainNN.plot_accs()
 
 elif rank == 1:
     #print('Start rank 1')

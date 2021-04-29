@@ -289,6 +289,7 @@ ALPHA = 0.005  # learning rate
 
 # parameter server
 if rank == 0:
+    accs = []
     LGobj = LogisticReg()  # get a linear regression object for parameter server
     # get a random weight vector including bias
     initialW = LGobj.getInitialW(NUM_FEATURES+1)
@@ -320,9 +321,23 @@ if rank == 0:
         comm.Send(vote, dest=1, tag=3)  # send sign votes to all workers
         comm.Send(vote, dest=2, tag=3)
         LGobj.W = LGobj.W-ALPHA*vote  # update the weight vector of server
+        if j % 1000 == 0:
+            accs.append(LGobj.accuracy(X_test, y_test))
+    accs.append(LGobj.accuracy(X_test, y_test))
     print(LGobj.accuracy(X_test, y_test))  # print accuracy with test data
     print('Confusion Matrix: ')
     print(confusion_matrix(y_test, LGobj.predict(X_test)))
+
+    #x_data = []
+    #y_data = []
+    # for i in range(1, NUM_ITERATIONS+1, 1000):
+    #    x_data.append(i)
+    # x_data.append(NUM_ITERATIONS)
+    #plt.plot(x_data, accs)
+    # plt.xticks(x_data)
+    #plt.xlabel('Number of iterations')
+    # plt.ylabel('Accuracy')
+    # plt.show()
 
 # worker 1
 elif rank == 1:
