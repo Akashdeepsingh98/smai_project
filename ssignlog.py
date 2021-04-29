@@ -1,5 +1,5 @@
 # dataset used is digit sign language.
-
+# dataset https://www.kaggle.com/ardamavi/sign-language-digits-dataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from sklearn.utils import shuffle
