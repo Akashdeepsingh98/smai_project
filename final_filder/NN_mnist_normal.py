@@ -34,6 +34,32 @@ class DeepNeuralNetwork():
 
         return params
 
+    def augment_gradient(self,params_worker1,params_worker2,params_worker3): # majority voting across workers for gradient
+        vote=list(np.zeros(len(params_worker1)))
+        for x in range(len(params_worker1)):
+            if(x>=0):
+                vote[x]=vote[x]+1
+            elif(x<0):
+                vote[x]=vote[x]-1
+        for x in range(len(params_worker2)):
+            if(x>=0):
+                vote[x]=vote[x]+1
+            elif(x<0):
+                vote[x]=vote[x]-1
+        for x in range(len(params_worker3)):
+            if(x>=0):
+                vote[x]=vote[x]+1
+            elif(x<0):
+                vote[x]=vote[x]-1
+        
+        for z in range(vote):
+            if(vote[z])>0:
+                vote[x]=1
+            elif vote[z]<0:
+                vote[z]=-1
+        
+        return vote
+
     def forward_pass(self, x_train):
         params = self.params
 
