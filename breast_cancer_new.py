@@ -36,7 +36,7 @@ class DeepNeuralNetwork():
             return exps / np.sum(exps, axis=0) * (1 - exps / np.sum(exps, axis=0))
         return exps / np.sum(exps, axis=0)
 
-    def initialization(self):
+    def initialization(self):  # initialize the layers with random values
         # number of nodes in each layer
         input_layer = self.sizes[0]
         hidden_1 = self.sizes[1]
@@ -52,7 +52,7 @@ class DeepNeuralNetwork():
 
         return params
 
-    def forward_pass(self, x_train):
+    def forward_pass(self, x_train): # forward pass data
         params = self.params
 
         # input layer activations becomes sample
@@ -97,6 +97,7 @@ class DeepNeuralNetwork():
         #    self.sigmoid(params['Z1'], derivative=True)
         #change_w['W1'] = np.outer(error, params['A0'])
 
+        # do gradient descent in reverse, send signs to parameter server and get majority vote
         error = grad2 = 2 * \
             (output-y_train)/output.shape[0] * \
             self.softmax(params['Z2'], derivative=True)
@@ -168,7 +169,7 @@ class DeepNeuralNetwork():
     def plot_accs(self):
         plt.plot(list(range(1, self.epochs+1)), self.accs)
         plt.xticks(list(range(1, self.epochs+1)))
-        plt.yticks(np.arange(0.6,1.0,0.05))
+        plt.yticks(np.arange(0.6, 1.0, 0.05))
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.show()
@@ -196,7 +197,7 @@ SIZES = [30, 5, 2]
 
 if rank == 0:
     accs = []
-    mainNN = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    mainNN = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE) 
     comm.Send(mainNN.params['W1'], dest=1, tag=1)
     comm.Send(mainNN.params['W2'], dest=1, tag=2)
     comm.Send(mainNN.params['W1'], dest=2, tag=1)
