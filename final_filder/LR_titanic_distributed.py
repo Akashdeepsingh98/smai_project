@@ -8,6 +8,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 from sklearn.utils import shuffle
 import math
+import time 
 
 # basic idea of how mpi works
 #comm = MPI.COMM_WORLD
@@ -289,6 +290,7 @@ ALPHA = 0.005  # learning rate
 
 # parameter server
 if rank == 0:
+    start = time.time()
     accs = []
     LGobj = LogisticReg()  # get a linear regression object for parameter server
     # get a random weight vector including bias
@@ -324,9 +326,10 @@ if rank == 0:
         if j % 1000 == 0:
             accs.append(LGobj.accuracy(X_test, y_test))
     accs.append(LGobj.accuracy(X_test, y_test))
-    print(LGobj.accuracy(X_test, y_test))  # print accuracy with test data
-    print('Confusion Matrix: ')
-    print(confusion_matrix(y_test, LGobj.predict(X_test)))
+    print(time.time()-start, ' seconds')
+    #print(LGobj.accuracy(X_test, y_test))  # print accuracy with test data
+    #print('Confusion Matrix: ')
+    #print(confusion_matrix(y_test, LGobj.predict(X_test)))
 
     #x_data = []
     #y_data = []

@@ -258,7 +258,7 @@ if rank == 0:
         #print(mainNN.compute_accuracy(x_val, y_val))
         accs.append(mainNN.compute_accuracy(x_val, y_val))
     mainNN.accs = accs
-    print(time.time()-start)
+    print(time.time()-start, ' seconds')
     mainNN.plot_accs()
 
 elif rank == 1:

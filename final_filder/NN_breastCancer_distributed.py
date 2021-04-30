@@ -238,7 +238,7 @@ if rank == 0:
         #print(mainNN.compute_accuracy(X_test, Y_test))
         accs.append(mainNN.compute_accuracy(X_test, Y_test))
     mainNN.accs = accs
-    print(time.time()-start)
+    print(time.time()-start, ' seconds')
     mainNN.plot_accs()
 elif rank == 1:
     nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)

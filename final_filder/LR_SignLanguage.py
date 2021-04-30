@@ -7,6 +7,7 @@ import math
 import pandas as pd
 import numpy as np
 from sklearn.metrics import accuracy_score
+import time
 x_l = np.load("X.npy") # image
 y_l = np.load("Y.npy") # label
 x_l.shape
@@ -99,6 +100,7 @@ class LogisticRegression_custom:
 
 #####
 
+start = time.time()
 X_train, X_test, y_train, y_test = train_test_split(df, y_l, test_size=0.3)
 class_list=[]
 vector=np.zeros(10)
@@ -112,7 +114,7 @@ for i in range(10):
     class_list.append(xcla.one_vs_all(X_test))
     vector[i]=0
     #print(class_list)
-
+print(time.time()-start,' seconds')
 
 
 result_class=[]

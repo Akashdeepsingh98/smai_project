@@ -52,7 +52,7 @@ class DeepNeuralNetwork():
 
         return params
 
-    def forward_pass(self, x_train): # forward pass data
+    def forward_pass(self, x_train):  # forward pass data
         params = self.params
 
         # input layer activations becomes sample
@@ -198,7 +198,7 @@ SIZES = [30, 5, 2]
 if rank == 0:
     start = time.time()
     accs = []
-    mainNN = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE) 
+    mainNN = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Send(mainNN.params['W1'], dest=1, tag=1)
     comm.Send(mainNN.params['W2'], dest=1, tag=2)
     comm.Send(mainNN.params['W1'], dest=2, tag=1)
@@ -239,7 +239,7 @@ if rank == 0:
         #print(mainNN.compute_accuracy(X_test, Y_test))
         accs.append(mainNN.compute_accuracy(X_test, Y_test))
     mainNN.accs = accs
-    print(time.time()-start)
+    print(time.time()-start,  ' seconds')
     mainNN.plot_accs()
 elif rank == 1:
     nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
