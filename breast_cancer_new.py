@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from keras.utils.np_utils import to_categorical
 from mpi4py import MPI
+import matplotlib.pyplot as plt
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -164,6 +165,14 @@ class DeepNeuralNetwork():
             #    iteration+1, time.time() - start_time, accuracy * 100
             # ))
 
+    def plot_accs(self):
+        plt.plot(list(range(1, self.epochs+1)), self.accs)
+        plt.xticks(list(range(1, self.epochs+1)))
+        plt.yticks(np.arange(0.6,1.0,0.05))
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy')
+        plt.show()
+
 
 train_x = pd.read_csv("cancer_data.csv")
 train_x = (train_x-train_x.mean())/train_x.std()
@@ -181,7 +190,7 @@ Y_test = to_categorical(Y_test.to_numpy())
 #dnn = DeepNeuralNetwork(sizes=[30, 5, 2])
 #dnn.train(train_x, train_y, X_test, Y_test)
 
-EPOCHS = 16  # global number of epochs
+EPOCHS = 8  # global number of epochs
 L_RATE = 0.001  # global learning rate
 SIZES = [30, 5, 2]
 
@@ -196,7 +205,7 @@ if rank == 0:
     print('Starting epochs')
     for epoch in range(EPOCHS):
         for i in range(209):
-            #if i % 50 == 0:
+            # if i % 50 == 0:
             #    print(i)
             grad12 = np.empty(mainNN.params['W2'].shape, dtype=np.int8)
             comm.Recv(grad12, source=1, tag=6)
@@ -224,9 +233,11 @@ if rank == 0:
             comm.Send(vote1, dest=2, tag=7)
 
             mainNN.update_network_parameters({'W1': vote1, 'W2': vote2})
-        print('Epochs: {}'.format(epoch+1))
-        print(mainNN.compute_accuracy(X_test, Y_test))
+        #print('Epochs: {}'.format(epoch+1))
+        #print(mainNN.compute_accuracy(X_test, Y_test))
         accs.append(mainNN.compute_accuracy(X_test, Y_test))
+    mainNN.accs = accs
+    mainNN.plot_accs()
 elif rank == 1:
     nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Recv(nn1.params['W1'], source=0, tag=1)
