@@ -12,3 +12,10 @@
 - For now both workers are using entire dataset to train, but with more work each worker will have an equal size subset of training data.
 - Testing data is only fed on parameter server.
 - The parameter server will take gradient signs from both workers, do majority voting and send signs back to workers, and it will do it as many times as number of iterations.
+
+# Important files
+- breast_cancer_new.py
+- prepdata.py
+- SignSGD_LR.py
+- SignSGD_NN.py
+- ssignlog.py
