@@ -192,6 +192,7 @@ SIZES = [784, 128, 64, 10]
 MINI_BATCH_SIZE = 100
 
 if rank == 0:
+    start = time.time()
     accs = []
     mainNN = DeepNeuralNetwork(
         sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
@@ -253,10 +254,11 @@ if rank == 0:
             mainNN.update_network_parameters(
                 {'W1': vote1, 'W2': vote2, 'W3': vote3})
 
-        print('Epochs: {}'.format(epoch+1))
-        print(mainNN.compute_accuracy(x_val, y_val))
+        #print('Epochs: {}'.format(epoch+1))
+        #print(mainNN.compute_accuracy(x_val, y_val))
         accs.append(mainNN.compute_accuracy(x_val, y_val))
-    mainNN.accs = accs 
+    mainNN.accs = accs
+    print(time.time()-start)
     mainNN.plot_accs()
 
 elif rank == 1:

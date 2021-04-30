@@ -168,7 +168,7 @@ class DeepNeuralNetwork():
     def plot_accs(self):
         plt.plot(list(range(1, self.epochs+1)), self.accs)
         plt.xticks(list(range(1, self.epochs+1)))
-        plt.yticks(np.arange(0.6,1.0,0.05))
+        plt.yticks(np.arange(0.6, 1.0, 0.05))
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.show()
@@ -195,6 +195,7 @@ L_RATE = 0.001  # global learning rate
 SIZES = [30, 5, 2]
 
 if rank == 0:
+    start = time.time()
     accs = []
     mainNN = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
     comm.Send(mainNN.params['W1'], dest=1, tag=1)
@@ -237,6 +238,7 @@ if rank == 0:
         #print(mainNN.compute_accuracy(X_test, Y_test))
         accs.append(mainNN.compute_accuracy(X_test, Y_test))
     mainNN.accs = accs
+    print(time.time()-start)
     mainNN.plot_accs()
 elif rank == 1:
     nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)

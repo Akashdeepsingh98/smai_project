@@ -160,10 +160,10 @@ class DeepNeuralNetwork():
                 changes_to_w = self.backward_pass(y, output)
                 self.update_network_parameters(changes_to_w)
 
-            accuracy = self.compute_accuracy(x_val, y_val)
-            print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
-                iteration+1, time.time() - start_time, accuracy * 100
-            ))
+            #accuracy = self.compute_accuracy(x_val, y_val)
+            #print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
+            #    iteration+1, time.time() - start_time, accuracy * 100
+            #))
 
 
 train_x = pd.read_csv("cancer_data.csv")
@@ -179,5 +179,7 @@ X_test = min_max_scaler.fit_transform(X_test)
 Y_test = pd.read_csv("test_cancer_data_y.csv")
 #Y_test = (Y_test).astype('float32')
 Y_test = to_categorical(Y_test.to_numpy())
-dnn = DeepNeuralNetwork(sizes=[30, 5, 2])
+start = time.time()
+dnn = DeepNeuralNetwork(sizes=[30, 5, 2], epochs = 8)
 dnn.train(train_x, train_y, X_test, Y_test)
+print(time.time()-start, ' seconds')
