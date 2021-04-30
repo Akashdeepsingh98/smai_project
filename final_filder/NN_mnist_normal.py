@@ -1,3 +1,10 @@
+from sklearn.datasets import fetch_openml
+import time
+from sklearn.model_selection import train_test_split
+import numpy as np
+from keras.utils.np_utils import to_categorical
+
+
 class DeepNeuralNetwork():
     def __init__(self, sizes, epochs=20, l_rate=0.001):
         self.sizes = sizes
@@ -21,43 +28,44 @@ class DeepNeuralNetwork():
 
     def initialization(self):
         # number of nodes in each layer
-        input_layer=self.sizes[0]
-        hidden_1=self.sizes[1]
-        hidden_2=self.sizes[2]
-        output_layer=self.sizes[3]
+        input_layer = self.sizes[0]
+        hidden_1 = self.sizes[1]
+        hidden_2 = self.sizes[2]
+        output_layer = self.sizes[3]
 
         params = {
-            'W1':np.random.randn(hidden_1, input_layer) * np.sqrt(1. / hidden_1),
-            'W2':np.random.randn(hidden_2, hidden_1) * np.sqrt(1. / hidden_2),
-            'W3':np.random.randn(output_layer, hidden_2) * np.sqrt(1. / output_layer)
+            'W1': np.random.randn(hidden_1, input_layer) * np.sqrt(1. / hidden_1),
+            'W2': np.random.randn(hidden_2, hidden_1) * np.sqrt(1. / hidden_2),
+            'W3': np.random.randn(output_layer, hidden_2) * np.sqrt(1. / output_layer)
         }
 
         return params
 
-    def augment_gradient(self,params_worker1,params_worker2,params_worker3): # majority voting across workers for gradient
-        vote=list(np.zeros(len(params_worker1)))
+    # majority voting across workers for gradient
+    def augment_gradient(self, params_worker1, params_worker2, params_worker3):
+        vote = list(np.zeros(len(params_worker1)))
         for x in range(len(params_worker1)):
-            if(x>=0):
-                vote[x]=vote[x]+1
-            elif(x<0):
-                vote[x]=vote[x]-1
+            if(x >= 0):
+                vote[x] = vote[x]+1
+            elif(x < 0):
+                vote[x] = vote[x]-1
         for x in range(len(params_worker2)):
-            if(x>=0):
-                vote[x]=vote[x]+1
-            elif(x<0):
-                vote[x]=vote[x]-1
+            if(x >= 0):
+                vote[x] = vote[x]+1
+            elif(x < 0):
+                vote[x] = vote[x]-1
         for x in range(len(params_worker3)):
-            if(x>=0):
-                vote[x]=vote[x]+1
-            elif(x<0):
-                vote[x]=vote[x]-1
-        
+            if(x >= 0):
+                vote[x] = vote[x]+1
+            elif(x < 0):
+                vote[x] = vote[x]-1
+
         for z in range(vote):
-            if(vote[z])>0:
-                vote[x]=1
-            elif vote[z]<0:
-                vote[z]=-1
-        
+            if(vote[z]) > 0:
+                vote[x] = 1
+            elif vote[z] < 0:
+                vote[z] = -1
+
         return vote
 
     def forward_pass(self, x_train):
@@ -87,7 +95,7 @@ class DeepNeuralNetwork():
 
             Note: There is a stability issue that causes warnings. This is 
                   caused  by the dot and multiply operations on the huge arrays.
-                  
+
                   RuntimeWarning: invalid value encountered in true_divide
                   RuntimeWarning: overflow encountered in exp
                   RuntimeWarning: overflow encountered in square
@@ -96,15 +104,18 @@ class DeepNeuralNetwork():
         change_w = {}
 
         # Calculate W3 update
-        error = 2 * (output - y_train) / output.shape[0] * self.softmax(params['Z3'], derivative=True)
+        error = 2 * (output - y_train) / \
+            output.shape[0] * self.softmax(params['Z3'], derivative=True)
         change_w['W3'] = np.outer(error, params['A2'])
 
         # Calculate W2 update
-        error = np.dot(params['W3'].T, error) * self.sigmoid(params['Z2'], derivative=True)
+        error = np.dot(params['W3'].T, error) * \
+            self.sigmoid(params['Z2'], derivative=True)
         change_w['W2'] = np.outer(error, params['A1'])
 
         # Calculate W1 update
-        error = np.dot(params['W2'].T, error) * self.sigmoid(params['Z1'], derivative=True)
+        error = np.dot(params['W2'].T, error) * \
+            self.sigmoid(params['Z1'], derivative=True)
         change_w['W1'] = np.outer(error, params['A0'])
 
         return change_w
@@ -120,7 +131,7 @@ class DeepNeuralNetwork():
                 gradient ∇J(x, y):  the gradient of the objective function,
                                     i.e. the change for a specific theta θ
         '''
-        
+
         for key, value in changes_to_w.items():
             self.params[key] -= self.l_rate * value
 
@@ -136,32 +147,35 @@ class DeepNeuralNetwork():
             output = self.forward_pass(x)
             pred = np.argmax(output)
             predictions.append(pred == np.argmax(y))
-        
+
         return np.mean(predictions)
 
     def train(self, x_train, y_train, x_val, y_val):
         start_time = time.time()
         for iteration in range(self.epochs):
-            for x,y in zip(x_train, y_train):
+            for x, y in zip(x_train, y_train):
                 output = self.forward_pass(x)
                 changes_to_w = self.backward_pass(y, output)
                 self.update_network_parameters(changes_to_w)
-            
-            accuracy = self.compute_accuracy(x_val, y_val)
-            print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
-                iteration+1, time.time() - start_time, accuracy * 100
-            ))
 
-from sklearn.datasets import fetch_openml
-from keras.utils.np_utils import to_categorical
-import numpy as np
-from sklearn.model_selection import train_test_split
-import time
+            #accuracy = self.compute_accuracy(x_val, y_val)
+            #print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
+            #    iteration+1, time.time() - start_time, accuracy * 100
+            #))
 
-x, y = fetch_openml('mnist_784', version=1, return_X_y=True)
-x = (x/255).astype('float32')
-y = to_categorical(y)
 
-x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.15, random_state=42)
+#x, y = fetch_openml('mnist_784', version=1, return_X_y=True)
+#x = x.astype('float32')/255
+#y = to_categorical(y)
+
+x_train = np.loadtxt('x_train.csv', delimiter=',')
+x_val = np.loadtxt('x_test.csv', delimiter=',')
+y_train = np.loadtxt('y_train.csv', delimiter=',')
+y_val = np.loadtxt('y_test.csv', delimiter=',')
+
+#x_train, x_val, y_train, y_val = train_test_split(
+#    x, y, test_size=0.15, random_state=42)
+start = time.time()
 dnn = DeepNeuralNetwork(sizes=[784, 128, 64, 10])
 dnn.train(x_train, y_train, x_val, y_val)
+print(time.time()-start, ' seconds')

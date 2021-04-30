@@ -5,7 +5,9 @@ Important files
 - NN_MNIST_distributed.py: Sign SGD on MNIST Neural network distributed.
 - LR_titanic_normal.py: Titanic Logistic Regression non-distributed
 - LR_titanic_distributed.py: Titanic Logistic Regression distributed
-- LR_SignLanguage-Logistic regression on Sign Language
+- LR_SignLanguage.py -Logistic regression on Sign Language
+
+
 
 Datasets Links:
 - MNSIT dataset: http://yann.lecun.com/exdb/mnist/
@@ -16,10 +18,10 @@ Datasets Links:
 
 
 Method to run each file:
-1. NN_breastCancer_normal.py
-
-Source of datasets
-1) Breast Cancer- https://archive.ics.uci.edu/ml/datasets/breast+cancer+wisconsin+(diagnostic)
-2) Sign Language Dataset- https://www.kaggle.com/ardamavi/sign-language-digits-dataset
-3) Titanic Dataset- https://www.kaggle.com/c/titanic
-4) Digit Mnist Dataset- https://keras.io/api/datasets/mnist/
+1. NN_breastCancer_normal.py: python NN_breastCancer_normal.py 
+2. NN_breastCancer_distributed.py: mpiexec -n 3 python NN_breastCancer_distributed.py
+3. NN_MNIST_normal.py: python NN_MNIST_normal.py
+4. NN_MNIST_distributed.py: mpiexec -n 4 NN_MNIST_distributed.py
+5. LR_titanic_normal.py: python LR_titanic_normal.py 
+6. LR_titanic_distributed.py: python LR_titanic_distributed.py
+7. LR_SignLanguage.py: python LR_SignLanguage.py
