@@ -9,3 +9,9 @@ Important files
 
 Method to run each file:
 1. NN_breastCancer_normal.py
+
+Source of datasets
+1) Breast Cancer- https://archive.ics.uci.edu/ml/datasets/breast+cancer+wisconsin+(diagnostic)
+2) Sign Language Dataset- https://www.kaggle.com/ardamavi/sign-language-digits-dataset
+3) Titanic Dataset- https://www.kaggle.com/c/titanic
+4) Digit Mnist Dataset- https://keras.io/api/datasets/mnist/
