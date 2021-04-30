@@ -1,3 +1,10 @@
+# Important files
+- breast_cancer_new.py: Neural network distributed for breast cancer.
+- prepdata.py: Prepare mnist data for neural network.
+- SignSGD_LR.py: Titanic Logistic Regression distributed.
+- SignSGD_NN.py: MNIST Neural network distributed.
+- ssignlog.py: signsgd without workers.
+
 # SMAI Project - SIGNSGD
 - Have to make a new class for logistic regression that will be specifically for signsgd.
 - Working:
@@ -12,10 +19,3 @@
 - For now both workers are using entire dataset to train, but with more work each worker will have an equal size subset of training data.
 - Testing data is only fed on parameter server.
 - The parameter server will take gradient signs from both workers, do majority voting and send signs back to workers, and it will do it as many times as number of iterations.
-
-# Important files
-- breast_cancer_new.py
-- prepdata.py
-- SignSGD_LR.py
-- SignSGD_NN.py
-- ssignlog.py
