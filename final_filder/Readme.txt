@@ -7,6 +7,14 @@ Important files
 - LR_titanic_distributed.py: Titanic Logistic Regression distributed
 - LR_SignLanguage-Logistic regression on Sign Language
 
+Datasets Links:
+- MNSIT dataset: http://yann.lecun.com/exdb/mnist/
+- Breast Cancer Dataset: https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/
+- Titanic Dataset: https://www.kaggle.com/c/titanic/data
+- Sign Language Digits Dataset: https://www.kaggle.com/ardamavi/sign-language-digits-dataset
+
+
+
 Method to run each file:
 1. NN_breastCancer_normal.py
 
