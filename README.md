@@ -5,6 +5,10 @@
 - SignSGD_NN.py: MNIST Neural network distributed.
 - ssignlog.py: signsgd without workers.
 
+# Datasets Links:
+- MNIST Digit Dataset: http://yann.lecun.com/exdb/mnist/
+- 
+
 # SMAI Project - SIGNSGD
 - Have to make a new class for logistic regression that will be specifically for signsgd.
 - Working:
