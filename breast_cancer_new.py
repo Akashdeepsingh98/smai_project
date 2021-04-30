@@ -1,3 +1,5 @@
+from itertools import tee
+from typing import Sized
 from sklearn.datasets import fetch_openml
 from sklearn import preprocessing
 import time
@@ -5,6 +7,10 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import numpy as np
 from keras.utils.np_utils import to_categorical
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 
 class DeepNeuralNetwork():
@@ -15,6 +21,7 @@ class DeepNeuralNetwork():
 
         # we save all parameters in the neural network in this dictionary
         self.params = self.initialization()
+        self.accs = []
 
     def sigmoid(self, x, derivative=False):
         if derivative:
@@ -80,22 +87,38 @@ class DeepNeuralNetwork():
         change_w = {}
 
         # Calculate W2 update
-        error = 2*(output-y_train) / \
-            output.shape[0]*self.softmax(params['Z2'], derivative=True)
-        change_w['W2'] = np.outer(error, params['A1'])
+        # error = 2*(output-y_train) / \
+        #    output.shape[0]*self.softmax(params['Z2'], derivative=True)
+        #change_w['W2'] = np.outer(error, params['A1'])
 
         # Calculate W1 update
-        error = np.dot(params['W2'].T, error) * \
-            self.sigmoid(params['Z1'], derivative=True)
-        change_w['W1'] = np.outer(error, params['A0'])
+        # error = np.dot(params['W2'].T, error) * \
+        #    self.sigmoid(params['Z1'], derivative=True)
+        #change_w['W1'] = np.outer(error, params['A0'])
 
-        '''
         error = grad2 = 2 * \
             (output-y_train)/output.shape[0] * \
             self.softmax(params['Z2'], derivative=True)
         grad2 = np.outer(grad2, params['A1'])
-        grad2 = 
-        '''
+        grad2[grad2 > 0] = 1
+        grad2[grad2 < 0] = -1
+        grad2[grad2 == 0] = 0
+        grad2 = grad2.astype(np.int8)
+        comm.Send(grad2, dest=0, tag=6)
+        comm.Recv(grad2, source=0, tag=9)
+        change_w['W2'] = grad2
+
+        error = grad1 = np.dot(
+            params['W2'].T, error)*self.sigmoid(params['Z1'], derivative=True)
+        grad1 = np.outer(grad1, params['A0'])
+        grad1[grad1 > 0] = 1
+        grad1[grad1 < 0] = -1
+        grad1[grad1 == 0] = 0
+        grad1 = grad1.astype(np.int8)
+        comm.Send(grad1, dest=0, tag=4)
+        comm.Recv(grad1, source=0, tag=7)
+        change_w['W1'] = grad1
+
         return change_w
 
     def update_network_parameters(self, changes_to_w):
@@ -136,21 +159,85 @@ class DeepNeuralNetwork():
                 changes_to_w = self.backward_pass(y, output)
                 self.update_network_parameters(changes_to_w)
 
-            accuracy = self.compute_accuracy(x_val, y_val)
-            print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
-                iteration+1, time.time() - start_time, accuracy * 100
-            ))
+            #accuracy = self.compute_accuracy(x_val, y_val)
+            # print('Epoch: {0}, Time Spent: {1:.2f}s, Accuracy: {2:.2f}%'.format(
+            #    iteration+1, time.time() - start_time, accuracy * 100
+            # ))
 
 
 train_x = pd.read_csv("cancer_data.csv")
-train_x = train_x.to_numpy().astype('float32')
+train_x = (train_x-train_x.mean())/train_x.std()
+train_x = train_x.to_numpy().astype('float64')
+
 train_y = pd.read_csv("cancer_data_y.csv")
 train_y = to_categorical(train_y.to_numpy())
+
 X_test = pd.read_csv("test_cancer_data.csv")
-X_test = X_test.to_numpy().astype('float32')
-#X_test = X_test.T
+X_test = (X_test-X_test.mean())/X_test.std()
+X_test = X_test.to_numpy().astype('float64')
+
 Y_test = pd.read_csv("test_cancer_data_y.csv")
-#Y_test = (Y_test).astype('float32')
 Y_test = to_categorical(Y_test.to_numpy())
-dnn = DeepNeuralNetwork(sizes=[30, 5, 2])
-dnn.train(train_x, train_y, X_test, Y_test)
+#dnn = DeepNeuralNetwork(sizes=[30, 5, 2])
+#dnn.train(train_x, train_y, X_test, Y_test)
+
+EPOCHS = 16  # global number of epochs
+L_RATE = 0.001  # global learning rate
+SIZES = [30, 5, 2]
+
+if rank == 0:
+    accs = []
+    mainNN = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    comm.Send(mainNN.params['W1'], dest=1, tag=1)
+    comm.Send(mainNN.params['W2'], dest=1, tag=2)
+    comm.Send(mainNN.params['W1'], dest=2, tag=1)
+    comm.Send(mainNN.params['W2'], dest=2, tag=2)
+
+    print('Starting epochs')
+    for epoch in range(EPOCHS):
+        for i in range(209):
+            #if i % 50 == 0:
+            #    print(i)
+            grad12 = np.empty(mainNN.params['W2'].shape, dtype=np.int8)
+            comm.Recv(grad12, source=1, tag=6)
+            grad22 = np.empty(mainNN.params['W2'].shape, dtype=np.int8)
+            comm.Recv(grad22, source=2, tag=6)
+
+            vote2 = grad12+grad22
+            vote2[vote2 > 0] = 1
+            vote2[vote2 < 0] = -1
+            vote2[vote2 == 0] = 0
+            comm.Send(vote2, dest=1, tag=9)
+            comm.Send(vote2, dest=2, tag=9)
+
+            grad11 = np.empty(mainNN.params['W1'].shape, dtype=np.int8)
+            comm.Recv(grad11, source=1, tag=4)
+            grad21 = np.empty(mainNN.params['W1'].shape, dtype=np.int8)
+            comm.Recv(grad21, source=2, tag=4)
+
+            vote1 = grad11+grad21
+            vote1[vote1 > 0] = 1
+            vote1[vote1 < 0] = -1
+            vote1[vote1 == 0] = 0
+
+            comm.Send(vote1, dest=1, tag=7)
+            comm.Send(vote1, dest=2, tag=7)
+
+            mainNN.update_network_parameters({'W1': vote1, 'W2': vote2})
+        print('Epochs: {}'.format(epoch+1))
+        print(mainNN.compute_accuracy(X_test, Y_test))
+        accs.append(mainNN.compute_accuracy(X_test, Y_test))
+elif rank == 1:
+    nn1 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    comm.Recv(nn1.params['W1'], source=0, tag=1)
+    comm.Recv(nn1.params['W2'], source=0, tag=2)
+    train_x = train_x[:209]
+    train_y = train_y[:209]
+    nn1.train(train_x, train_y, X_test, Y_test)
+elif rank == 2:
+    nn2 = DeepNeuralNetwork(sizes=SIZES, epochs=EPOCHS, l_rate=L_RATE)
+    comm.Recv(nn2.params['W1'], source=0, tag=1)
+    comm.Recv(nn2.params['W2'], source=0, tag=2)
+    train_x = train_x[209:]
+    train_y = train_y[209:]
+    nn2.train(train_x, train_y, X_test, Y_test)
